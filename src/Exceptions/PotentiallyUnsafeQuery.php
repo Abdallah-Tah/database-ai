@@ -1,6 +1,6 @@
 <?php
 
-namespace Amohamed\DatabaseAi\Oracle\Exceptions;
+namespace Amohamed\DatabaseAi\Exceptions;
 
 use Exception;
 

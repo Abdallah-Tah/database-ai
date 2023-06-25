@@ -6,7 +6,7 @@ use OpenAI\Client;
 use App\Models\ChatBot;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
-use Amohamed\DatabaseAi\Oracle\Exceptions\PotentiallyUnsafeQuery;
+use Amohamed\DatabaseAi\Exceptions\PotentiallyUnsafeQuery;
 
 class Oracle
 {

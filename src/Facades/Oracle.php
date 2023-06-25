@@ -1,6 +1,6 @@
 <?php
 
-namespace Amohamed\DatabaseAi\Oracle\Facades;
+namespace Amohamed\DatabaseAi\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
