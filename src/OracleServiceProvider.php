@@ -16,8 +16,10 @@ class OracleServiceProvider extends PackageServiceProvider
             ->hasViews();
     }
 
-    public function registeringPackage()
+    public function boot()
     {
+        parent::boot();
+
         DB::macro('ask', function (string $question) {
             return $this->app->make(Oracle::class)->ask($question);
         });
