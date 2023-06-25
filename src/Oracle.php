@@ -25,14 +25,21 @@ class Oracle
     {
         DB::connection()->getDoctrineSchemaManager()->getDatabasePlatform()->registerDoctrineTypeMapping('enum', 'string');
 
-        $query = $this->getQuery($question);
-
-        // $identifyCompany = $this->identifyCompany($question);
-
         if ($this->secretKey === null) {
             $identifyCompany = $this->identifyCompany($question);
 
-            return $identifyCompany;
+            if ($identifyCompany === $this->secretQuestion) {
+                return $identifyCompany;
+            }
+
+            $this->companyId = $identifyCompany;
+        }
+
+        $query = $this->getQuery($question);
+
+        // Add company filter to the query
+        if ($this->companyId !== null) {
+            $query = $this->addCompanyFilter($query, $this->companyId);
         }
 
         $validatedQuery = $this->validateDataExists($question, $query);
@@ -53,27 +60,45 @@ class Oracle
             ->trim('"');
     }
 
-    //addCompanyFilter
+    protected function identifyCompany(string $question): string
+    {
+        // Extract the secret key from the question
+        $this->secretKey = $this->extractSecretKeyFromQuestion($question);
+
+        // Check if the user has provided the company code
+        if (empty($this->secretKey)) {
+            // Ask the user for the company code
+            return $this->secretQuestion;
+        }
+
+        // Here you check if the provided company code is in the database
+        return $this->getCompanyId($this->secretKey);
+    }
+
+
     protected function addCompanyFilter(string $query, string $company): string
     {
         $company = Str::of($company)
             ->trim()
             ->trim('"');
 
-        $query = Str::of($query)
+
+        $removeClause = preg_replace("/WHERE secret_key = '[^']*'/i", "", $query);
+
+        $queryResult = Str::of($removeClause)
             ->trim()
             ->trim(';')
             ->append(" WHERE company_id = $company;");
 
-        return $query;
+        return $queryResult;
     }
-
 
     public function getQuery(string $question): string
     {
         $prompt = $this->buildPrompt($question);
 
         $query = $this->queryOpenAi($prompt, "\n");
+
         $query = Str::of($query)
             ->trim()
             ->trim('"');
@@ -85,7 +110,7 @@ class Oracle
 
     protected function queryOpenAi(string $prompt, string $stop, float $temperature = 0.0)
     {
-        // dd($prompt, $stop, $temperature);
+
         $completions = $this->client->completions()->create([
             'model' => 'text-davinci-003',
             'prompt' => $prompt,
@@ -93,7 +118,6 @@ class Oracle
             'max_tokens' => 100,
             'stop' => $stop,
         ]);
-
         // If response is NULL, return a default message
         if (!$completions->choices[0]->text) {
             return "I'm sorry, I don't know the answer to that question.";
@@ -221,45 +245,19 @@ class Oracle
         }
     }
 
-    protected function identifyCompany(string $question): string
-    {
-        // Extract the secret key from the question
-        $this->secretKey = $this->extractSecretKeyFromQuestion($question);
-
-        dd($this->secretKey);
-
-        // Check if the user has provided the company code
-        if (empty($this->secretKey)) {
-            // Ask the user for the company code
-            $chatResponse = $this->client->chat()->create([
-                'model' => 'gpt-3.5-turbo-0613',
-                'messages' => [
-                    ['role' => 'assistant', 'content' => "As an assistant, I'm trying to find whether your question '{$question}' contains a company name or a secret key. If it's not included, could you please provide your company's secret key?"],
-                    ['role' => 'user', 'content' => $question],
-                ],
-            ]);
-
-            // Get the company code from the user's message
-            $this->secretKey = $chatResponse->choices[0]->message->content;
-        }
-
-        // Here you check if the provided company code is in the database
-        return $this->getCompanyId($this->secretKey);
-    }
-
     // Once we have the secret key, we query the database to get the company id from the table chat_bots
     protected function getCompanyId(string $companyCode): int
     {
         $company = ChatBot::where('secret_key', $companyCode)->first();
 
         if (!$company) {
-            // The code provided doesn't match any company in the database.
-            // Throw an exception or return a message to ask for the code again.
-            throw new \Exception("Invalid company code. Please provide a valid company code.");
+            throw new \Exception('Sorry, I could not find the company you are looking for.');
         }
 
-        return $company->company_id; // Return the company's id
+        return $this->companyId = $company->company_id;
+        // Return the company's id
     }
+
 
     // Method to extract secret key from user's question
     protected function extractSecretKeyFromQuestion(string $question): ?string
@@ -273,28 +271,29 @@ class Oracle
             'functions' => [
                 [
                     'name' => 'extract_secret_key',
-                    'description' => 'Extract the secret key from a given text',
+                    'description' => 'Extract only the secret key from the user\'s question',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'text' => [
                                 'type' => 'string',
-                                'description' => 'The text to extract the secret key from',
+                                'description' => 'The user\'s question',
                             ],
                         ],
-                        'required' => ['text'],
+                        'required' => ['extract_secret_key'],
                     ],
                 ]
             ]
         ]);
 
-        // Get the secret key from the response
-        dd($response->choices);
         foreach ($response->choices as $result) {
-            dd($result->function->results->secret_key);
-            if (isset($result->function)) {
-                return dd($result->function->results->secret_key);
+            if (isset($result->message->functionCall)) {
+                $arguments = json_decode($result->message->functionCall->arguments);
+                $getSecretKey = $arguments->text;
+                $this->secretKey = Str::after($getSecretKey, 'The secret key is ');
             }
         }
+
+        return $this->secretKey;
     }
 }
