@@ -1,0 +1,31 @@
+{
+    "name": "amohamed/database-ai",
+    "description": "Use natural language and AI to query your database from Laravel",
+    "type": "library",
+    "require": {
+        "php": ">=7.2",
+        "doctrine/dbal": ">=3.2",
+        "illuminate/contracts": ">=9.0",
+        "spatie/laravel-package-tools": ">=1.0",
+        "spatie/once": ">=3.0",
+        "openai-php/laravel": ">=0.6.0"
+    },
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Amohamed\\DatabaseAi\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Abdallah Mohamed",
+            "email": "abdal_cascad@hotmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    }
+}
