@@ -11,6 +11,6 @@ class Oracle extends Facade
 {
     protected static function getFacadeAccessor()
     {
-        return \Amohamed\DatabaseAi\Oracle\Oracle::class;
+        return \Amohamed\DatabaseAi\Oracle::class;
     }
 }
