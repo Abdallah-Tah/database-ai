@@ -8,11 +8,13 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Amohamed\DatabaseAi\Exceptions\PotentiallyUnsafeQuery;
+use App\Models\Company;
 
 class Oracle
 {
     protected string $connection;
     protected ?int $companyId = null;
+    protected ?int $userId = null;
 
     public function __construct(protected Client $client)
     {
@@ -22,23 +24,33 @@ class Oracle
     public function setCompanyId(int $companyId)
     {
         $this->companyId = $companyId;
+
+        $company = DB::table('companies')->where('id', $companyId)->first();
+        $this->userId = $company->user_id;
+
+        Log::info("Company ID set to {$companyId}");
+        Log::info("User ID set to {$this->userId}");
     }
 
     public function ask(string $question): string
     {
-        DB::connection()->getDoctrineSchemaManager()->getDatabasePlatform()->registerDoctrineTypeMapping('enum', 'string');
+        try {
+            DB::connection()->getDoctrineSchemaManager()->getDatabasePlatform()->registerDoctrineTypeMapping('enum', 'string');
 
-        $query = $this->getQuery($question);
+            $query = $this->getQuery($question);
 
-        $result = json_encode($this->evaluateQuery($query));
+            $result = json_encode($this->evaluateQuery($query));
 
-        $prompt = $this->buildPrompt($question, $query, $result);
+            $prompt = $this->buildPrompt($question, $query, $result);
 
-        $answer = $this->queryOpenAi($prompt, "\n", 0.7);
+            $answer = $this->queryOpenAi($prompt, "\n", 0.7);
 
-        return Str::of($answer)
-            ->trim()
-            ->trim('"');
+            return Str::of($answer)
+                ->trim()
+                ->trim('"');
+        } catch (\Exception $e) {
+            return "Sorry, I don't understand your question.";
+        }
     }
 
     public function getQuery(string $question): string
@@ -50,6 +62,10 @@ class Oracle
             ->trim()
             ->trim('"');
 
+        if ($this->userId !== null) {
+            $query = str_replace('<user_id>', $this->userId, $query);
+        }
+
         $this->ensureQueryIsSafe($query);
 
         return $query;
@@ -58,7 +74,7 @@ class Oracle
     protected function queryOpenAi(string $prompt, string $stop, float $temperature = 0.0)
     {
         $completions = $this->client->completions()->create([
-            'model' => 'text-davinci-003',
+            'model' => 'text-davinci-002',
             'prompt' => $prompt,
             'temperature' => $temperature,
             'max_tokens' => 100,
@@ -85,6 +101,10 @@ class Oracle
 
     protected function evaluateQuery(string $query): object
     {
+        if ($this->userId !== null) {
+            $query = str_replace('<user_id>', '?', $query);
+        }
+
         return DB::connection($this->connection)->select($this->getRawQuery($query))[0] ?? new \stdClass();
     }
 

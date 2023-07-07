@@ -1,6 +1,6 @@
 <?php
 
-namespace Amohamed\DatabaseAi\Oracle;
+namespace Amohamed\DatabaseAi;
 
 use Illuminate\Support\Facades\DB;
 use Spatie\LaravelPackageTools\Package;
